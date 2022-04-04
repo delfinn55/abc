@@ -1,6 +1,9 @@
 # Access
 .htaccess
 
+# Composer files
+vendor/
+
 # Node artifact files
 node_modules/
 package-lock.json
