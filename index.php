@@ -1,17 +1,43 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
-    <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <link rel="stylesheet" href="css/style.css">
-    <script src="js/script.js"></script>
-    <title>Document</title>
-</head>
-<body>
-    <div class="container">
-        <p>Hello, world!</p>
-    </div>
-</body>
-</html>
+<?php
+
+class User
+{
+    protected int $id;
+    protected string $login;
+    public string $password;
+    protected int $status;
+
+    public function __construct(int $id, string $login, string $password)
+    {
+        $this->id = $id;
+        $this->login = $login;
+        $this->password = $password;
+        $this->status = 0;
+    }
+
+    public function isNew(){
+        return $this->status == 0;
+    }
+
+    public function isAccepted(){
+        return $this->status == 1;
+    }
+
+    public function isBanned(){
+        return $this->status == 2;
+    }
+
+    public function accept(){
+        return $this->status = 1;
+    }
+
+    public function ban(){
+        return $this->status = 2;
+    }
+}
+
+$user1 = new User(1, 'admin', 'dknfgkdfsjgklfjglk');
+$user2 = new User(2, 'manager', 'qwerty');
+
+$user1->accept();
+$user1->ban();
