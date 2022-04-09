@@ -1,7 +1,7 @@
 <?php
 ini_set('display_errors', 1);
 
-class Tag
+abstract class Tag
 {
     protected string $name;
     protected array $attributes;
@@ -33,10 +33,7 @@ class Tag
      * Without this func I had error:
      * "Potentially polymorphic call. Tag does not have members in its hierarchy"
      */
-    protected function render() : string
-    {
-        return '';
-    }
+    abstract protected function render() : string;
 }
 
 class SingleTag extends Tag
