@@ -1,7 +1,26 @@
 <?php
 ini_set('display_errors', 1);
 
-abstract class Tag
+function report(?string $message = null){
+    static $reports = [];
+
+    if($message === null){
+        echo '<pre>';
+        print_r($reports);
+        echo '</pre>';
+        return $reports;
+    }
+    else{
+        $reports[] = $message;
+    }
+}
+
+abstract class Node
+{
+
+}
+
+abstract class Tag extends Node
 {
     protected string $name;
     protected array $attributes;
@@ -29,10 +48,6 @@ abstract class Tag
         return $attributes_str;
     }
 
-    /**
-     * Without this func I had error:
-     * "Potentially polymorphic call. Tag does not have members in its hierarchy"
-     */
     abstract protected function render() : string;
 }
 
@@ -95,19 +110,10 @@ class PairTag extends Tag
     }
 }
 
-//$img = new SingleTag('img');
-//$img->attr('src', 'img/banner.jpg')
-//    ->attr('style', 'width: 100px;')
-//    ->attr('alt', 'nz');
-//
-//$hr = new SingleTag('hr');
-//
-//$a = new PairTag('a');
-//echo $a->attr('href', './nz')
-//    ->appendChild($hr)
-//    ->appendChild($img)
-//    ->appendChild($hr)
-//    ->render();
+abstract class TextNode extends Node
+{
+    
+}
 
 
 // Test
