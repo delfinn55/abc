@@ -4,41 +4,102 @@ ini_set('display_errors', 1);
 function report(?string $message = null){
     static $reports = [];
 
-    if($message === null){
+    if ($message === null) {
         echo '<pre>';
         print_r($reports);
         echo '</pre>';
         return $reports;
-    }
-    else{
+    } else {
         $reports[] = $message;
     }
 }
 
 abstract class Node
 {
+    abstract protected function sanitize($str) : string;
 
+    abstract protected function getValidateErrors() : array;
+
+    abstract protected function render() : string;
+
+    public function isValid() : bool
+    {
+        $errors = $this->getValidateErrors();
+
+        if (!empty($errors)) {
+            foreach ($errors as $error) {
+                report($error);
+            }
+            return false;
+        }
+
+        return true;
+    }
 }
 
 abstract class Tag extends Node
 {
-    protected string $name;
-    protected array $attributes;
+    public string $name;
+    protected array $attributes = [];
+    protected array $allowed_attributes = [];
+    protected array $required_attributes = [];
 
     public function __construct(string $name)
     {
         $this->name = $name;
-        $this->attributes = [];
+        $this->allowed_attributes = ['class', 'title'];
     }
 
-    public function attr($name, $value) : object
+    // For tests
+    public function setAllowedAttributes(array $list) : object
     {
-        $this->attributes[$name] = $value;
+        $this->allowed_attributes = $list;
 
         return $this;
     }
 
-    protected function implodeAttributes($attributes) : string
+    // For tests
+    public function setRequiredAttributes(array $list) : object
+    {
+        $this->required_attributes = $list;
+
+        return $this;
+    }
+
+    public function attr($name, $value) : object
+    {
+        $this->attributes[$name] = $this->sanitize($value);
+
+        return $this;
+    }
+
+    protected function sanitize($str) : string
+    {
+        return htmlspecialchars($str);
+    }
+
+    protected function getValidateErrors() : array
+    {
+        $errors = [];
+
+        // Validate allowed attributes
+        foreach (array_keys($this->attributes) as $attr) {
+            if (!in_array($attr, $this->allowed_attributes)) {
+                $errors[] = 'class[' . self::class . '] -> Attribute "' . $attr . '" is not allowed for "' . $this->name . '"';
+            }
+        }
+
+        // Validate required attributes
+        foreach ($this->required_attributes as $attr) {
+            if (!in_array($attr, array_keys($this->attributes))) {
+                $errors[] = 'class[' . self::class . '] -> Tag "' . $this->name . '" should contain attribute "' . $attr . '"';
+            }
+        }
+
+        return $errors;
+    }
+
+    protected function renderAttributes($attributes) : string
     {
         $attributes_str = '';
         foreach ($attributes as $name => $value) {
@@ -47,21 +108,14 @@ abstract class Tag extends Node
 
         return $attributes_str;
     }
-
-    abstract protected function render() : string;
 }
 
 class SingleTag extends Tag
 {
-    public function __construct(string $name)
-    {
-        parent::__construct($name);
-    }
-
     public function render() : string
     {
         $html = '<' . $this->name;
-        $html .= $this->implodeAttributes($this->attributes);
+        $html .= $this->renderAttributes($this->attributes);
         $html .= '>';
 
         return $html;
@@ -70,27 +124,30 @@ class SingleTag extends Tag
 
 class PairTag extends Tag
 {
-    private string $content;
-    private array $content_tags;
+    private array $content_nodes;
 
-    public function __construct(string $name)
+    public function appendChild(Node $node) : object
     {
-        parent::__construct($name);
-        $this->content = '';
-    }
-
-    public function appendChild(Tag $tag) : object
-    {
-        $this->content_tags[] = $tag;
+        $this->content_nodes[] = $node;
 
         return $this;
     }
 
-    private function parseContent($tags) : string
+    protected function getValidateErrors() : array
+    {
+        $errors = parent::getValidateErrors();
+        foreach ($this->content_nodes as $node) {
+            $errors = array_merge($errors, $node->getValidateErrors());
+        }
+
+        return $errors;
+    }
+
+    private function renderContent() : string
     {
         $tags_str = '';
-        foreach ($this->content_tags as $tag) {
-            $tags_str .= $tag->render();
+        foreach ($this->content_nodes as $node) {
+            $tags_str .= $node->render();
         }
 
         return $tags_str;
@@ -99,10 +156,10 @@ class PairTag extends Tag
     public function render() : string
     {
         $html = '<' . $this->name;
-        $html .= $this->implodeAttributes($this->attributes);
+        $html .= $this->renderAttributes($this->attributes);
         $html .= '>';
 
-        $html .= $this->parseContent($this->content_tags);
+        $html .= $this->renderContent();
 
         $html .= '</' . $this->name . '>';
 
@@ -110,53 +167,101 @@ class PairTag extends Tag
     }
 }
 
-abstract class TextNode extends Node
+class Img extends SingleTag
 {
-    
+    public function __construct()
+    {
+        parent::__construct('img');
+        $this->allowed_attributes = array_merge($this->allowed_attributes, ['src', 'alt', 'width', 'height']);
+        $this->required_attributes = array_merge($this->required_attributes, ['src', 'alt']);
+    }
 }
 
-
-// Test
-function forTest() : PairTag
+class A extends PairTag
 {
-    // Label #1 block
-    $label1 = new PairTag('label');
-
-    $img1 = new SingleTag('img');
-    $img1->attr('src', 'f1.jpg')
-        ->attr('alt', 'f1 not found');
-
-    $input1 = new SingleTag('input');
-    $input1->attr('type', 'text')
-        ->attr('name', 'f1');
-
-    $label1->appendChild($img1)->appendChild($input1);
-
-    // Label #2
-    $label2 = new PairTag('label');
-
-    $img2 = new SingleTag('img');
-    $img2->attr('src', 'f2.jpg')
-        ->attr('alt', 'f2 not found');
-
-    $input2 = new SingleTag('input');
-    $input2->attr('type', 'password')
-        ->attr('name', 'f2');
-
-    $label2->appendChild($img2)->appendChild($input2);
-
-    // Submit
-    $submit = new SingleTag('input');
-    $submit->attr('type', 'submit')->attr('value', 'Send');
-
-    // Form
-    $form = new PairTag('form');
-    return $form->appendChild($label1)->appendChild($label2)->appendChild($submit);
+    public function __construct()
+    {
+        parent::__construct('a');
+        $this->allowed_attributes = array_merge($this->allowed_attributes, ['href']);
+        $this->required_attributes = array_merge($this->required_attributes, ['href']);
+    }
 }
 
-echo forTest()->render();
+class TextNode extends Node
+{
+    private string $text;
+
+    public function __construct($text)
+    {
+        $this->text = $text;
+    }
+
+    protected function sanitize($str) : string
+    {
+        return htmlspecialchars($str);
+    }
+
+    protected function getValidateErrors() : array
+    {
+        $errors = [];
+
+        // Validate empty text
+        if (empty($this->text)) {
+            $errors[] = 'class[' . self::class . '] -> Text is empty';
+        }
+
+        return $errors;
+    }
+
+    public function render() : string
+    {
+        return $this->sanitize($this->text);
+    }
+}
+
+$img = (new Img)
+    ->attr('class', 'img')
+    ->attr('title', 'image')
+    ->attr('src', 'img/1.jpg')
+    ->attr('alt', 'Great JPEG')
+    ->attr('class', '"><script>alert("Hello");</script><img class="a');
+
+$hr1 = (new SingleTag('hr'))
+    ->setAllowedAttributes(['id', 'class4398570384'])
+    ->setRequiredAttributes(['style'])
+    ->attr('class', 'hr')
+    ->attr('id', '34');
+
+$hr2 = (new SingleTag('hr'))
+    ->setAllowedAttributes(['id', 'class'])
+    ->attr('class', 'hr')
+    ->attr('id', '8797');
+
+$t1 = new TextNode('Hello, <script>alert("Hello");</script>, world!');
+$t2 = new TextNode('link');
+$t3 = new TextNode('');
+
+$h1 = (new PairTag('h2'))->appendChild($img)->appendChild($hr1)->appendChild($t2)->appendChild($t1);
+$h2 = new PairTag('h2');
+
+$a = (new A)
+    ->attr('class', 'link')
+    ->attr('href', 'https://yandex.ru')
+    ->appendChild($t2);
+
+$root = (new PairTag('div'))
+    ->setAllowedAttributes(['id', 'class'])
+    ->setRequiredAttributes(['id'])
+    ->attr('class', 'div')
+    ->attr('id', '2')
+    ->appendChild($img)
+    ->appendChild($t1)
+    ->appendChild($hr2)
+    ->appendChild($a);
 
 
-
-
-
+if ($root->isValid()) {
+    echo $root->render();
+} else {
+    report();
+}
