@@ -1,9 +1,6 @@
 #Tests
 test.php
 
-# Access
-.htaccess
-
 # Composer files
 vendor/
 
